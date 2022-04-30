@@ -34,6 +34,19 @@ class gis:
     ###################################################
     #Selets a Set of Cities With Conditional Arguments#
     ###################################################
+    # Description: initially calls validator methods for attribute and bounds passed in to make sure they are valid options.
+    # an atribute value is returned as well for later use in referencing which sublist index to use as filter criteria.
+    # then, if current query is empty, fill the query with all item, then check bound type to filter based on integer or string.
+    # for INTEGER =>
+    #               checks the attribute in sublist item and if out of range, go to next sublist item, else add it to tempList
+    # for String => a double for loop:
+    #               first loop iterates through a sublist of current query items.
+    #               second loop uses an established alphabet list and bounds index to loop through
+    #               all letters in between lower and upper bound letters, then compares the in between letters
+    #               to the first letter in the sublist attribute chosen(either name or state).
+    #               if it does not match, continue to compare next letter,
+    #               if it does match, adds current sublist to tempList and continue to next sublist.(skips further letter checking)
+    #
     def selectCities(self, attribute, lowerBound, upperBound):
         attribute = attribute.lower()
         (isAnAtr, atrValue) = self.isAtrValid(attribute)
@@ -41,21 +54,39 @@ class gis:
         isAnUpperBound = self.isBoundValid(atrValue, upperBound)
         tempSelected = []
         if (isAnAtr and isALowerBound and isAnUpperBound):
+            if len(self.currentlySelected) == 0:
+                self.selectAllCities()
             if type(lowerBound) == int:
                 for sublist in self.currentlySelected:
-                    if any(item < lowerBound or item >= upperBound for item in sublist[atrValue]):
+                    #print("Sublist: ", sublist)
+                    if sublist[atrValue] <= lowerBound or sublist[atrValue] > upperBound:
                         continue
                     tempSelected.append(sublist)
-                print(tempSelected)
-                #self.currentlySelected = tempSelected
+                # print("Temp Selected Items: ", tempSelected)
+                self.currentlySelected = tempSelected
             else:
-                pass  # implement filter words in between two letters
+                lowerIndex = self.alphabet.index(lowerBound)
+                upperIndex = self.alphabet.index(upperBound)
+                # print("LowerIndex: ", lowerIndex,
+                #       "\nlowerAlphabet: ", self.alphabet[lowerIndex],
+                #       "\nUpperIndex: ", upperIndex,
+                #       "\nupperAlphabet: ", self.alphabet[upperIndex])
+                for sublist in self.currentlySelected:
+                    # add +1 to upper index to include upperBound letter
+                    for i in range(lowerIndex, upperIndex):
+                        if sublist[atrValue][0] != self.alphabet[i]:
+                            continue
+                        tempSelected.append(sublist)
+                        continue
+                #print("Temp Selected: ", tempSelected)
+                self.currentlySelected = tempSelected
+
         else:
             raise ValueError
 
-    ######################################
-    #Checks if attribute is a valid input#
-    ######################################
+        ######################################
+        #Checks if attribute is a valid input#
+        ######################################
 
     def isAtrValid(self, attribute):
         if attribute in self.ATR_OPTIONS.keys():
@@ -91,7 +122,7 @@ class gis:
     #########################################################################
     #Print Methods, calls other methods that generate String to Print Result#
     #########################################################################
-    def printCities(self, attribute="name", choice="S"):
+    def printCities(self, attribute="name", choice="F"):
         (isAnAtr, atrValue) = self.isAtrValid(attribute)
         if (isAnAtr):
             self.sortCurrentlySelected(atrValue)
@@ -120,11 +151,11 @@ class gis:
     def generateStringShort(self):
         finalString = ""
         for i in range(len(self.currentlySelected)):
-            print("Name: ", self.currentlySelected[i][0],
-                  "\nState: ", self.currentlySelected[i][1],
-                  "\nLatitude: ", self.currentlySelected[i][2],
-                  "\nLongitude", self.currentlySelected[i][3],
-                  "\nPopulation", self.currentlySelected[i][4])
+            # print("Name: ", self.currentlySelected[i][0],
+            #       "\nState: ", self.currentlySelected[i][1],
+            #       "\nLatitude: ", self.currentlySelected[i][2],
+            #       "\nLongitude", self.currentlySelected[i][3],
+            #       "\nPopulation", self.currentlySelected[i][4])
             finalString += str(i) + ": " + self.currentlySelected[i][0] + \
                 ", " + self.currentlySelected[i][1] + "\n"
         return finalString
@@ -206,11 +237,20 @@ class gis:
 
 
 def main():
+    delimiter = "/*******************************************/"
     test = gis()
     test.selectAllCities()
-    # test.unselectAllCities()
-    # test.setArrayFromFile()
     test.printCities()
+    print(delimiter)
+    test.unselectAllCities()
+    test.printCities()
+    print(delimiter)
+    test.selectCities("state", "R", "T")
+    test.printCities()
+    print(delimiter)
+    test.selectCities("population", 12000, 100000)
+    test.printCities()
+    print(delimiter)
 
 
 main()
