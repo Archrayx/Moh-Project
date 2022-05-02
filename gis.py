@@ -1,4 +1,4 @@
-from multiprocessing.sharedctypes import Value
+
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -9,7 +9,8 @@ class gis:
     # used to store final output of query
     final_results = []
     # used to hold current query
-    currentlySelected = []
+    currentlySelectedCities = []
+    currentlySelectedEdges = []
     # Alphabet List
     alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
                 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
@@ -24,12 +25,13 @@ class gis:
     data = ""
     dataList = []
 
-    # Ctor
+    # Ctor Set file to skip first four lines unneeded lines
     def __init__(self):
         self.file = open("gis.dat", "r")
         self.data = self.file.read()
         self.dataList = self.data.split("\n")[4:]
-        pass
+        self.setArrayFromFile()
+        self.file.close()
 
     ###################################################
     #Selets a Set of Cities With Conditional Arguments#
@@ -47,42 +49,66 @@ class gis:
     #               if it does not match, continue to compare next letter,
     #               if it does match, adds current sublist to tempList and continue to next sublist.(skips further letter checking)
     #
-    def selectCities(self, attribute, lowerBound, upperBound):
+    def selectCities(self, attribute, lowerBound, upperBound=None):
         attribute = attribute.lower()
         (isAnAtr, atrValue) = self.isAtrValid(attribute)
         isALowerBound = self.isBoundValid(atrValue, lowerBound)
         isAnUpperBound = self.isBoundValid(atrValue, upperBound)
-        tempSelected = []
+        if atrValue == 1:
+            isAnUpperBound = True
         if (isAnAtr and isALowerBound and isAnUpperBound):
-            if len(self.currentlySelected) == 0:
+            if len(self.currentlySelectedCities) == 0:
                 self.selectAllCities()
-            if type(lowerBound) == int:
-                for sublist in self.currentlySelected:
-                    #print("Sublist: ", sublist)
-                    if sublist[atrValue] <= lowerBound or sublist[atrValue] > upperBound:
-                        continue
-                    tempSelected.append(sublist)
-                # print("Temp Selected Items: ", tempSelected)
-                self.currentlySelected = tempSelected
-            else:
-                lowerIndex = self.alphabet.index(lowerBound)
-                upperIndex = self.alphabet.index(upperBound)
-                # print("LowerIndex: ", lowerIndex,
-                #       "\nlowerAlphabet: ", self.alphabet[lowerIndex],
-                #       "\nUpperIndex: ", upperIndex,
-                #       "\nupperAlphabet: ", self.alphabet[upperIndex])
-                for sublist in self.currentlySelected:
-                    # add +1 to upper index to include upperBound letter
-                    for i in range(lowerIndex, upperIndex):
-                        if sublist[atrValue][0] != self.alphabet[i]:
-                            continue
-                        tempSelected.append(sublist)
-                        continue
-                #print("Temp Selected: ", tempSelected)
-                self.currentlySelected = tempSelected
-
+            if atrValue == 0:
+                self.currentlySelectedCities = self.selectAttributeCity(
+                    lowerBound, upperBound, atrValue)
+            elif atrValue == 1:
+                print("\n~~~~~~~~Bound reached~~~~~~~")
+                self.currentlySelectedCities = self.selectAttributeState(
+                    lowerBound, atrValue)
+            elif atrValue >= 2:
+                self.currentlySelectedCities = self.selectAttributeOther(
+                    lowerBound, upperBound, atrValue)
         else:
             raise ValueError
+
+    #######################
+    #selects cities method#
+    #######################
+    def selectAttributeCity(self, lowerBound, upperBound, atrValue):
+        tempSelected = []
+        lowerIndex = self.alphabet.index(lowerBound)
+        upperIndex = self.alphabet.index(upperBound)
+        for sublist in self.currentlySelectedCities:
+            # add +1 to upper index to include upperBound letter
+            for i in range(lowerIndex, upperIndex):
+                if sublist[atrValue][0] != self.alphabet[i]:
+                    continue
+                tempSelected.append(sublist)
+                continue
+        return tempSelected
+
+    ######################
+    #select States method#
+    ######################
+    def selectAttributeState(self, lowerBound, atrValue):
+        tempSelected = []
+        for sublist in self.currentlySelectedCities:
+            if sublist[atrValue] != lowerBound:
+                continue
+            tempSelected.append(sublist)
+        return tempSelected
+
+    #########################################
+    # select integer based attributes method#
+    #########################################
+    def selectAttributeOther(self, lowerBound, upperBound, atrValue):
+        tempSelected = []
+        for sublist in self.currentlySelectedCities:
+            if sublist[atrValue] <= lowerBound or sublist[atrValue] > upperBound:
+                continue
+            tempSelected.append(sublist)
+        return tempSelected
 
         ######################################
         #Checks if attribute is a valid input#
@@ -107,17 +133,18 @@ class gis:
     #select all cities in gis.dat file#
     ###################################
     def selectAllCities(self):
-        self.setArrayFromFile()
+        if self.currentlySelectedCities != None:
+            self.unselectAllCities()
         for i in range(len(self.dataDict.keys())):
-            self.currentlySelected.append([
-                self.dataDict[i+1]["name"], self.dataDict[i+1]["state"], self.dataDict[i+1]["latitude"], self.dataDict[i+1]["longitude"], self.dataDict[i+1]["population"]])
+            self.currentlySelectedCities.append([
+                self.dataDict[i+1]["name"], self.dataDict[i+1]["state"], self.dataDict[i+1]["latitude"], self.dataDict[i+1]["longitude"], self.dataDict[i+1]["population"], self.dataDict[i+1]["distances"]])
 
     #######################################
     #unselect all cities in current filter#
     #######################################
 
     def unselectAllCities(self):
-        self.currentlySelected = []
+        self.currentlySelectedCities = []
 
     #########################################################################
     #Print Methods, calls other methods that generate String to Print Result#
@@ -135,14 +162,35 @@ class gis:
         else:
             raise ValueError
 
+    def selectEdges(self, lowerBound, upperBound):
+        pass
+
+    def selectAllEdges(self):
+        print("Edge: ", self.currentlySelectedCities[1][5][-1])
+        for i in range(len(self.currentlySelectedCities)):
+            if i == 0:
+                self.currentlySelectedEdges.append([[self.currentlySelectedCities[i][0] + " " + self.currentlySelectedCities[i][1]],
+                                                   []])
+            time.sleep(3)
+            self.currentlySelectedEdges.append([self.currentlySelectedCities[i][0] + " " + self.currentlySelectedCities[i][1],
+                                               self.currentlySelectedCities[i][5][-1]])
+
+    def unselectAllEdges(self):
+        pass
+
+    def printEdges(self):
+        for i in range(2):
+            print("\n", i, " :", self.currentlySelectedEdge[2])
+
     ###################################
     #Generates a string in FULL Format#
     ###################################
+
     def generateStringFull(self):
         finalString = ""
-        for i in range(len(self.currentlySelected)):
-            finalString += str(i) + ": " + self.currentlySelected[i][0] + ", " + self.currentlySelected[i][1] + "[" + str(self.currentlySelected[
-                i][2]) + "," + str(self.currentlySelected[i][3]) + "]" + str(self.currentlySelected[i][4]) + "\n"
+        for i in range(len(self.currentlySelectedCities)):
+            finalString += str(i) + ": " + self.currentlySelectedCities[i][0] + ", " + self.currentlySelectedCities[i][1] + "[" + str(self.currentlySelectedCities[
+                i][2]) + "," + str(self.currentlySelectedCities[i][3]) + "]" + str(self.currentlySelectedCities[i][4]) + "\n"
         return finalString
 
     ################################
@@ -150,14 +198,14 @@ class gis:
     ################################
     def generateStringShort(self):
         finalString = ""
-        for i in range(len(self.currentlySelected)):
-            # print("Name: ", self.currentlySelected[i][0],
-            #       "\nState: ", self.currentlySelected[i][1],
-            #       "\nLatitude: ", self.currentlySelected[i][2],
-            #       "\nLongitude", self.currentlySelected[i][3],
-            #       "\nPopulation", self.currentlySelected[i][4])
-            finalString += str(i) + ": " + self.currentlySelected[i][0] + \
-                ", " + self.currentlySelected[i][1] + "\n"
+        for i in range(len(self.currentlySelectedCities)):
+            # print("Name: ", self.currentlySelectedCities[i][0],
+            #       "\nState: ", self.currentlySelectedCities[i][1],
+            #       "\nLatitude: ", self.currentlySelectedCities[i][2],
+            #       "\nLongitude", self.currentlySelectedCities[i][3],
+            #       "\nPopulation", self.currentlySelectedCities[i][4])
+            finalString += str(i) + ": " + self.currentlySelectedCities[i][0] + \
+                ", " + self.currentlySelectedCities[i][1] + "\n"
         return finalString
 
     ########################################
@@ -165,7 +213,7 @@ class gis:
     ########################################
     # Link: https://www.geeksforgeeks.org/python-sort-list-according-second-element-sublist/
     def sortCurrentlySelected(self, value):
-        self.currentlySelected.sort(key=lambda x: x[value])
+        self.currentlySelectedCities.sort(key=lambda x: x[value])
 
         ##############################################
         #Sets a readable dictionary set for each name#
@@ -173,50 +221,44 @@ class gis:
         # DESCRIPTION: This creates a dictionary to allow easy referencing of names and matching data
 
     def setArrayFromFile(self):
-        count = 1
-        currentName = ""
-        currentOther = ""
-        currentDistances = []
-        currentKeys = []
-        for i in self.dataList:
-            split = i.split(", ")
-            if len(split) == 2:
-                currentDistances = []
-                currentName = split[0]
-                (currentState, other) = self.splitState(split[1])
-                (currentLatitude, other) = self.splitLatitude(other)
-                (currentLongitude, other) = self.splitLongitude(other)
-                currentPopulation = other
+        if len(self.dataDict) == 0:
 
-                currentKeys.append(currentName)
-                self.dataDict[count] = {"name": currentName,
-                                        "state": currentState,
-                                        "latitude": int(currentLatitude),
-                                        "longitude": int(currentLongitude),
-                                        "population": int(currentPopulation),
-                                        "distances": []}
-                count += 1
-                # UNNEEDED PRINT STATEMENTS FOR TESTING PURPOSES
-                # print("\nName: ", currentName,
-                #       "\nOther: ", currentOther)
+            count = 1
+            currentName = ""
+            currentOther = ""
+            currentDistances = []
+            currentKeys = []
+            for i in self.dataList:
+                split = i.split(", ")
+                if len(split) == 2:
+                    currentDistances = []
+                    currentName = split[0]
+                    (currentState, other) = self.splitState(split[1])
+                    (currentLatitude, other) = self.splitLatitude(other)
+                    (currentLongitude, other) = self.splitLongitude(other)
+                    currentPopulation = other
 
-            else:
-                currentDistances += split[0].split(" ")
-                if len(currentDistances) == len(currentKeys) - 1:
-                    # UNNEEDED PRINT STATEMENTS FOR TESTING PURPOSES
-                    # print("\nDistances Count: ", len(currentDistances),
-                    #       "\nKeys Count: ", len(currentKeys),
-                    #       "\nKeys: ", currentKeys,
-                    #       "\nDictionary Counter: ", count)
-                    for i in range(len(currentKeys) - 1):
-                        self.dataDict[count - 1]["distances"].append([
-                            currentKeys[i], currentDistances[i]])
-
-        self.dataArray = np.array(self.dataList)
+                    currentKeys.append(currentName)
+                    self.dataDict[count] = {"name": currentName,
+                                            "state": currentState,
+                                            "latitude": int(currentLatitude),
+                                            "longitude": int(currentLongitude),
+                                            "population": int(currentPopulation),
+                                            "distances": []}
+                    count += 1
+                else:
+                    currentDistances += split[0].split(" ")
+                    lengthOfCurrentKeys = len(currentKeys) - 1
+                    if len(currentDistances) == len(currentKeys) - 1:
+                        for i in range(len(currentKeys)-1):
+                            self.dataDict[count - 1]["distances"].append([
+                                currentKeys[lengthOfCurrentKeys-1], currentDistances[i]])
+                            lengthOfCurrentKeys -= 1
 
     ##################################
     # Splits string to retrieve State#
     ##################################
+
     def splitState(self, value):
         value = value.split("[")
         return (value[0], value[1])
@@ -235,22 +277,46 @@ class gis:
         value = value.split("]")
         return (value[0], value[1])
 
+    def printDataDict(self):
+        print(self.dataDict[3])
+
+    def printEdges(self):
+        for i in range(len(self.currentlySelectedEdges)):
+            print(i, ": ", self.currentlySelectedEdges)
+
 
 def main():
     delimiter = "/*******************************************/"
     test = gis()
     test.selectAllCities()
     test.printCities()
+    print("printing All Cities")
     print(delimiter)
+    # time.sleep(5)
+    #
     test.unselectAllCities()
     test.printCities()
+    print("\nprinting no Cities")
     print(delimiter)
-    test.selectCities("state", "R", "T")
+    # time.sleep(5)
+    #
+    test.selectCities("name", "R", "U")
     test.printCities()
+    print("\nprinting filter name")
     print(delimiter)
-    test.selectCities("population", 12000, 100000)
+   # time.sleep(5)
+    #
+    test.selectCities("population", 60000, 100000)
     test.printCities()
+    print("\nprinting filter population")
     print(delimiter)
+    # time.sleep(5)
+    #
+    test.selectCities("state", "CA")
+    test.printCities()
+    print("\nprinting filter state")
+    print(delimiter)
+    # time.sleep(5)
 
 
 main()
